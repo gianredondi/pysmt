@@ -482,6 +482,22 @@ class FormulaManager(object):
             raise PysmtTypeError("Argument is of type %s, but INT was "
                                  "expected!\n" % t)
 
+    def ToInt(self, formula):
+        """ Floor-cast a formula to integer type (SMT-LIB to_int). """
+        t = self.env.stc.get_type(formula)
+        if t == types.INT:
+            # Already an integer
+            return formula
+        elif t == types.REAL:
+            if formula.is_real_constant():
+                import math
+                return self.Int(math.floor(formula.constant_value()))
+            return self.create_node(node_type=op.TOINT,
+                                    args=(formula,))
+        else:
+            raise PysmtTypeError("Argument is of type %s, but REAL was "
+                                 "expected!\n" % t)
+
     def AtMostOne(self, *args):
         """ At most one of the bool expressions can be true at anytime.
 
