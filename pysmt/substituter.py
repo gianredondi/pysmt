@@ -137,6 +137,7 @@ class Substituter(pysmt.walkers.IdentityDagWalker):
             # 1. We create a new substitution in which we remove the
             #    bound variables from the substitution map
             substitutions = kwargs["substitutions"]
+            interpretations = kwargs.get("interpretations", {})
             new_subs = {}
             for k,v in substitutions.items():
                 # If at least one bound variable is in the cone of k,
@@ -147,9 +148,12 @@ class Substituter(pysmt.walkers.IdentityDagWalker):
                     new_subs[k] = v
 
             # 2. We apply the substitution on the quantifier body with
-            #    the new 'reduced' map
+            #    the new 'reduced' map; interpretations are always
+            #    propagated since function symbols cannot be bound by
+            #    quantifiers.
             sub = self.__class__(self.env)
-            res_formula = sub.substitute(formula.arg(0), new_subs)
+            res_formula = sub.substitute(formula.arg(0), new_subs,
+                                         interpretations)
 
             # 3. We invoke the relevant function (walk_exists or
             #    walk_forall) to compute the substitution
@@ -222,7 +226,8 @@ class Substituter(pysmt.walkers.IdentityDagWalker):
                 param_types = k.symbol_type().param_types
                 formal_params = [self.manager.FreshSymbol(tp) for tp in param_types]
                 body = self.manager.Function(v, formal_params)
-                uf_interps[k] = FunctionInterpretation(formal_params, body)
+                uf_interps[k] = FunctionInterpretation(formal_params, body,
+                                                        allow_free_vars=True)
             else:
                 regular_subs[k] = v
         # Explicit interpretations take priority over auto-generated ones
