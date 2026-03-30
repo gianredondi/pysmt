@@ -191,6 +191,13 @@ class Substituter(pysmt.walkers.IdentityDagWalker):
         - Term substitution
         `self.substitute(phi, {Plus(a, Int(1)): Int(5)})`
         will give `Equals(Function(f, [Int(2), Int(3)]), Int(6))`
+
+        - UF-to-UF substitution (function symbol renaming):
+        `self.substitute(phi, {f: g})`
+        where `f` and `g` are function symbols of the same type will replace
+        all applications of `f` with corresponding applications of `g`.
+        This is syntactic sugar for providing a FunctionInterpretation in
+        `interpretations`.
         """
 
         # Check that formula is a term
@@ -201,6 +208,28 @@ class Substituter(pysmt.walkers.IdentityDagWalker):
             subs = {}
         if interpretations is None:
             interpretations = {}
+
+        # Pre-process subs: if a key is a function symbol (not a term) and
+        # the value is also a function symbol of the same type, auto-convert
+        # to a FunctionInterpretation and move to interpretations.
+        # This allows convenient UF renaming via the subs dict.
+        uf_interps = {}
+        regular_subs = {}
+        for k, v in subs.items():
+            if (k.is_symbol() and not k.is_term() and
+                    v.is_symbol() and not v.is_term() and
+                    k.symbol_type() == v.symbol_type()):
+                param_types = k.symbol_type().param_types
+                formal_params = [self.manager.FreshSymbol(tp) for tp in param_types]
+                body = self.manager.Function(v, formal_params)
+                uf_interps[k] = FunctionInterpretation(formal_params, body)
+            else:
+                regular_subs[k] = v
+        # Explicit interpretations take priority over auto-generated ones
+        merged_interps = uf_interps
+        merged_interps.update(interpretations)
+        subs = regular_subs
+        interpretations = merged_interps
 
         for i, (k, v) in enumerate(subs.items()):
             # Check that substitutions are terms
